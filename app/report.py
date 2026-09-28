@@ -5,7 +5,7 @@ PR verdicts, open issues, forks, rival PRs, the stack and the merge map. No IO h
 """
 import datetime as dt
 
-from scoring import KIND_LABELS, cost_comparison
+from scoring import KIND_LABELS, cost_comparison, latest_runs
 
 PLAN_TITLES = {
     "safe": "Безопасный — максимум по баллу без конфликтов внутри",
@@ -16,22 +16,12 @@ PLAN_TITLES = {
 }
 
 
-def last_cycle(runs):
-    """Runs of the latest cycle: everything since the last PR fetch (runs accumulate over time)."""
-    cycle = []
-    for r in reversed(runs):
-        cycle.append(r)
-        if r.get("stage") == "fetch":
-            break
-    return list(reversed(cycle))
-
-
 def build_report(P):
     cfg = P["config"]
     repo = cfg["repo"]
     areas = cfg.get("area_labels") or {}
     rows = [r for r in P["rows"].values() if r.get("classified")]
-    cycle = last_cycle(P["runs"])
+    cycle = latest_runs(P["runs"])  # stages are rerun on their own: the latest run of each is the current data
     cost = sum(r.get("cost_usd") or 0 for r in cycle)
     tokens = sum(r.get("input_tokens") or 0 for r in cycle)
 
@@ -54,7 +44,7 @@ def build_report(P):
 
     out = [f"# PR Scout: {repo}", "", f"Отчёт от {dt.date.today().isoformat()}. "
            f"PR с баллами: {len(rows)}, финалистов: {len(P['finalists'])}. "
-           f"Последний цикл: Jev потратил ${cost:.4f} ({tokens:,} входных токенов).".replace(f"{tokens:,}", f"{tokens:,}".replace(",", " ")), ""]
+           f"Текущие данные: Jev потратил ${cost:.4f} ({tokens:,} входных токенов).".replace(f"{tokens:,}", f"{tokens:,}".replace(",", " ")), ""]
     for r in cycle:
         out.append(f"- `{r.get('stage')}`: {r.get('items')} шт · {r.get('seconds')} с · ${r.get('cost_usd') or 0} · ошибок {r.get('errors') or 0}")
     comp = cost_comparison(cycle)

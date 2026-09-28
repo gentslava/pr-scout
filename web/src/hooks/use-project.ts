@@ -36,8 +36,15 @@ export function useStartJob(slug: string) {
 /** The server job a pipeline starts with, so the UI shows the right step before the first event. */
 const FIRST_JOB: Partial<Record<JobName, string>> = { full: "fetch", everything: "fetch", issues: "fetch_issues", forks: "fetch_forks" }
 
-/** Jev cost of every stage that asked it, not only the PR stages. */
-export const jevRuns = (runs: Run[]) => runs.filter((r) => (r.input_tokens ?? 0) > 0)
+/**
+ * Jev cost of the data on screen: the latest run of every stage that asked Jev. Runs pile up
+ * over a project's life and stages are rerun on their own, so summing all of them would count reruns.
+ */
+export const jevRuns = (runs: Run[]) => {
+  const last = new Map<string, Run>()
+  for (const r of runs) if ((r.input_tokens ?? 0) > 0) last.set(r.stage, r)
+  return [...last.values()]
+}
 
 /** Area/kind labels with a readable fallback. */
 export const labelOf = (map: Record<string, string> | undefined, key: string | undefined) => (key ? map?.[key] ?? key : "—")

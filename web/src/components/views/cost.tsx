@@ -63,7 +63,7 @@ function Comparison({ cmp }: { cmp: NonNullable<Summary["comparison"]> }) {
         ))}
       </div>
       <p className="mt-6 text-[12.5px] leading-relaxed text-muted-foreground">
-        Логарифмическая шкала. Для Claude — те же {fmt(cmp.input_tokens)} входных токенов плюс ~{fmt(cmp.output_estimate)} выходных (JSON и короткое обоснование).
+        Считается по последнему прогону каждого этапа — по данным, которые сейчас на экране. Логарифмическая шкала. Для Claude — те же {fmt(cmp.input_tokens)} входных токенов плюс ~{fmt(cmp.output_estimate)} выходных (JSON и короткое обоснование).
         Цены Anthropic за 1M токенов: Opus 5.5 $4/$20, Sonnet 5 $2/$10, Haiku 4.5 $1/$5; Batch −50%. Цена скорости и дешевизны: Jev не пишет обоснований,
         поэтому решения собираются из атомарных вопросов и проверяются кодом (git, CI) на этапе 2.
       </p>
