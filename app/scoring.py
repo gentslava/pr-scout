@@ -242,8 +242,20 @@ LLM_PRICES = {"Claude Opus 5.5": (4.0, 20.0), "Claude Sonnet 5": (2.0, 10.0), "C
 OUTPUT_ESTIMATE = {"stage1": 1000, "stage2": 1500, "issues": 800, "forks": 800, "rivals": 400, "map": 300}
 
 
+def latest_runs(runs):
+    """The latest run of every stage, oldest first: what produced the data on screen.
+
+    Runs accumulate over the life of a project, and stages are rerun on their own, so a sum
+    over all of them counts reruns and stale data; the latest run per stage does not.
+    """
+    last = {}
+    for r in runs:
+        last[r.get("stage")] = r
+    return sorted(last.values(), key=lambda r: r.get("started") or "")
+
+
 def cost_comparison(runs):
-    jev = [r for r in runs if r.get("stage") in OUTPUT_ESTIMATE and r.get("input_tokens")]
+    jev = [r for r in latest_runs(runs) if r.get("stage") in OUTPUT_ESTIMATE and r.get("input_tokens")]
     if not jev:
         return None
     inp = sum(r.get("input_tokens", 0) for r in jev)
