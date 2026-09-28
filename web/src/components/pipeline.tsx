@@ -31,7 +31,7 @@ function headline(key: string, run: Run | undefined, s: Summary, prs: PrRow[]): 
     case "describe": {
       const n = prs.filter((r) => r.ai_description).length
       if (n) return count(n, "описание", "описания", "описаний")
-      return !s.config.ollama?.enabled ? "выключены" : run ? "нечего дописывать" : null
+      return !s.config.describer?.enabled ? "выключены" : run ? "нечего дописывать" : null
     }
     case "stage1": return s.classified ? `${fmt(s.classified)} оценено` : null
     case "stage2": return s.finalists && run ? count(s.finalists, "финалист", "финалиста", "финалистов") : null

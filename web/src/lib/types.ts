@@ -65,6 +65,8 @@ export interface Run {
   cost_usd?: number
   model?: string
   conflicts?: number
+  /** a describe run on a local model: its tokens cost nothing */
+  local?: boolean
   up_to_date?: number
   gone?: number
 }
@@ -77,12 +79,24 @@ export interface Job {
   started: number | null
 }
 
-export interface OllamaConfig {
+/** Who writes missing PR descriptions: an LLM provider id from the server (see LlmProvider) and its model. */
+export interface DescriberConfig {
   enabled: boolean
-  /** who writes missing descriptions: a local Ollama model or NordRouter's chat endpoint */
-  provider?: "ollama" | "nordrouter"
+  provider: string
   model: string
   min_body: number
+}
+
+export interface LlmProvider {
+  id: string
+  name: string
+  kind: "ollama" | "openai"
+  local: boolean
+  /** usable now: a key is set, or none is needed */
+  ready: boolean
+  /** the variable that enables it, when it needs a key */
+  key_env: string | null
+  default_model: string
 }
 
 export interface ForksConfig {
@@ -100,7 +114,7 @@ export interface ProjectConfig {
   stack_prs: number[]
   stack_prs_url: string
   finalists: number
-  ollama: OllamaConfig
+  describer: DescriberConfig
   forks?: ForksConfig
   default_branch?: string
 }
@@ -334,7 +348,7 @@ export interface Status {
   jev_ready: boolean
   github_ready: boolean
   jev: JevInfo
-  nordrouter_ready: boolean
+  llm_providers: LlmProvider[]
   ollama_models: string[]
 }
 

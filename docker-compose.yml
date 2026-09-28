@@ -15,9 +15,17 @@ services:
       APP_PASSWORD: ${APP_PASSWORD}
       # Recommended: a GitHub token without scopes (higher rate limit, CI status of finalists)
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
-      # Local model for PR descriptions (Ollama on the Docker host)
+      # LLM providers for PR descriptions, picked per project: Ollama on the Docker host...
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
-      # ...or NordRouter's chat endpoint for them, no GPU needed (needs NORDROUTER_API_KEY)
+      # ...or an OpenAI-compatible endpoint: a key enables a built-in preset (NORDROUTER_API_KEY above)
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # ...or any other one, without code: see .env.example
+      LLM_API_URL: ${LLM_API_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_API_NAME: ${LLM_API_NAME:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_PROVIDERS: ${LLM_PROVIDERS:-}
       NORDROUTER_URL: ${NORDROUTER_URL:-}
       DESCRIBER_MODEL: ${DESCRIBER_MODEL:-}
       DESCRIBER_WORKERS: ${DESCRIBER_WORKERS:-}

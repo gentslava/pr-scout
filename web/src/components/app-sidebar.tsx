@@ -19,6 +19,8 @@ export function AppSidebar() {
   const { slug, setSlug, setAddOpen, job } = useApp()
   const { resolvedTheme, setTheme } = useTheme()
   const models = status.data?.ollama_models ?? []
+  const cloud = (status.data?.llm_providers ?? []).filter((p) => !p.local && p.ready)
+  const llmText = [models.length ? `Ollama · ${models.length} мод.` : null, ...cloud.map((p) => p.name)].filter(Boolean).join(", ")
 
   return (
     <Sidebar>
@@ -64,7 +66,7 @@ export function AppSidebar() {
         <ul className="flex flex-col gap-1.5 text-xs text-muted-foreground">
           <Service ok={status.data?.jev_ready} text={status.data?.jev_ready ? "Jev подключён" : "Jev: нет ключа"} />
           <Service ok={status.data?.github_ready} text={status.data?.github_ready ? "GitHub токен есть" : "GitHub: нет токена"} />
-          <Service ok={models.length > 0} text={models.length ? `Ollama · ${models.length} мод.` : "Ollama недоступна"} />
+          <Service ok={!!llmText} text={llmText ? `LLM: ${llmText}` : "LLM: нет ни одного провайдера"} />
         </ul>
         <Button variant="outline" size="icon" className="rounded-full" aria-label="Сменить тему"
           onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>

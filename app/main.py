@@ -27,6 +27,7 @@ from scoring import (KIND_LABELS, NEGATIVE, QUESTION_LABELS, STAGE2_QUESTIONS, a
 import triage
 from triage import (FORK_KIND_LABELS, ISSUE_KIND_LABELS, ISSUE_KINDS, ISSUE_QUESTION_LABELS, apply_rival, fork_questions,
                     issue_questions, rival_question, score_fork, score_issue)
+import llm
 from report import build_report
 
 
@@ -60,16 +61,11 @@ JEV_LABEL = f"{JEV_MODEL} · {_JEV['name']}"  # what the run history shows as th
 PRICE_PER_MTOK = float(env("JEV_PRICE_PER_MTOK", str(_JEV["price"])))
 GH_TOKEN = env("GITHUB_TOKEN")
 PASSWORD = env("APP_PASSWORD")
-OLLAMA_URL = env("OLLAMA_URL", "http://host.docker.internal:11434").rstrip("/")
 # NordRouter allows 15 rps on /v1/evaluate; stage 1 is ~1.1 s per PR, so 14 workers stay under it.
 STAGE1_WORKERS = int(env("JEV_STAGE1_WORKERS", "14"))
 STAGE2_WORKERS = int(env("JEV_STAGE2_WORKERS", "10"))
-# Descriptions of PRs whose author wrote nothing: a local Ollama model, or NordRouter's
-# OpenAI-compatible chat endpoint (no GPU needed). gemini-3.1-flash-lite ~8 s per diff;
-# deepseek-v4-flash is 10x cheaper but took 85 s on the same input, so it is too slow here.
-NORDROUTER_URL = env("NORDROUTER_URL", "https://nordrouter.com").rstrip("/")
-NORDROUTER_KEY = env("NORDROUTER_API_KEY")
-DESCRIBER_MODEL = env("DESCRIBER_MODEL", "google/gemini-3.1-flash-lite")
+# Descriptions of PRs whose author wrote nothing come from an LLM provider (llm.py); cloud
+# endpoints take this many parallel requests, a local Ollama two.
 DESCRIBER_WORKERS = int(env("DESCRIBER_WORKERS", "6"))
 # Stage 2 git work (fetch branch, test merge, diff) runs in parallel worktrees instead of one PR
 # at a time, which cost 32 of 48 minutes on a 3000-PR run while Jev answered in 21 s. Git is
@@ -130,7 +126,7 @@ def migrate_legacy():
     if (DATA / "repo").exists():
         shutil.move(str(DATA / "repo"), str(target / "repo"))
     cfg = {"repo": repo, "name": repo.split("/")[1], "profile": "", "community_only": True, "exclude_authors": [], "stack_prs": [],
-           "stack_prs_url": "", "finalists": 120, "ollama": {"enabled": True, "model": "qwen3.5:9b", "min_body": 200}}
+           "stack_prs_url": "", "finalists": 120, "describer": {"enabled": True, "provider": "ollama", "model": "qwen3.5:9b", "min_body": 200}}
     cfg.update(preset_for(repo))
     write_json(target / "config.json", cfg)
 
@@ -140,6 +136,10 @@ def load_project(slug):
     p = {"config": read_json(d / "config.json", None)}
     if not p["config"]:
         return
+    if "ollama" in p["config"]:  # describer settings lived under `ollama` before other providers existed
+        p["config"]["describer"] = describer_config(p["config"])
+        p["config"].pop("ollama")
+        write_json(d / "config.json", p["config"])
     for name, default in (("prs", []), ("stage1", {}), ("stage2", {}), ("runs", []), ("issues", {}), ("forks", {}),
                           ("rivals", {}), ("stack", {}), ("map", {})):
         p[name] = read_json(d / f"{name}.json", default)
@@ -574,54 +574,51 @@ def save_prs(slug):
     write_json(pdir(slug) / "prs.json", list(projects[slug]["prs"].values()))
 
 
-def ollama_models():
-    try:
-        return [m["name"] for m in http_json(f"{OLLAMA_URL}/api/tags", timeout=10)["models"] if "embed" not in m["name"]]
-    except Exception:
-        return []
+def describer_config(cfg):
+    """The project's describer settings; projects saved before providers existed kept them under `ollama`."""
+    d = dict(cfg.get("describer") or cfg.get("ollama") or {})
+    d.setdefault("provider", "ollama")
+    return d
 
 
 def describe_job(slug):
     """Write a description from the diff when the author wrote little or nothing.
 
-    Two providers: a local Ollama model (the default) or NordRouter's OpenAI-compatible
-    chat endpoint, which needs no local GPU (`ollama.provider: "nordrouter"` in the config).
+    Any LLM provider from llm.py writes it: a local Ollama or an OpenAI-compatible endpoint
+    (NordRouter, OpenRouter, OpenAI, a custom one), chosen per project in `describer`.
     """
     P, t0, started = projects[slug], time.time(), now_iso()
     cfg = P["config"]
-    oc = cfg.get("ollama") or {}
-    if not oc.get("enabled"):
+    dc = describer_config(cfg)
+    if not dc.get("enabled"):
         return None
-    provider = oc.get("provider") or "ollama"
-    if provider == "nordrouter" and not NORDROUTER_KEY:
-        raise RuntimeError("Для описаний через NordRouter нужен NORDROUTER_API_KEY")
+    prov = llm.get(dc["provider"])
+    if not llm.is_ready(prov):
+        raise RuntimeError(f"Для описаний через {prov['name']} нужен {prov['key_env']}")
+    model = dc.get("model") or prov.get("model")
+    if not model:
+        raise RuntimeError(f"Не выбрана модель {prov['name']} для описаний: задайте её в настройках проекта")
     if not GH_TOKEN:
         raise RuntimeError("Для описаний нужен GITHUB_TOKEN (скачиваю дифы)")
-    todo = [p for p in P["prs"].values() if len(p.get("body") or "") < oc.get("min_body", 200) and not p.get("ai_description")]
-    out_tokens = 0
+    todo = [p for p in P["prs"].values() if len(p.get("body") or "") < dc.get("min_body", 200) and not p.get("ai_description")]
+    out_tokens, errors = 0, 0
     progress(0, len(todo), phase="describe")
 
     def one(pr):
         req = urllib.request.Request(f"https://api.github.com/repos/{cfg['repo']}/pulls/{pr['number']}", headers=gh_headers({"Accept": "application/vnd.github.diff"}))
         with urllib.request.urlopen(req, timeout=60) as r:
-            diff = r.read().decode(errors="ignore")[: oc.get("max_diff", 24000)]
+            diff = r.read().decode(errors="ignore")[: dc.get("max_diff", 24000)]
         prompt = ("You review a GitHub pull request whose author wrote little or no description. From the title and the diff, "
                   "write a plain English description in 3-5 sentences: what problem it fixes or what it adds, and what the change does. "
                   f"No headings, no bullet points.\n\nTitle: {pr['title']}\n\nAuthor's text: {pr.get('body') or '(none)'}\n\nDiff:\n{diff}")
-        if provider == "nordrouter":
-            res = http_json_retry(f"{NORDROUTER_URL}/v1/chat/completions",
-                                  {"model": oc.get("model") or DESCRIBER_MODEL, "messages": [{"role": "user", "content": prompt}],
-                                   "max_tokens": oc.get("max_tokens", 400), "temperature": 0.2},
-                                  {"Authorization": f"Bearer {NORDROUTER_KEY}", "Content-Type": "application/json"}, 180)
-            usage = res.get("usage") or {}
-            text = (res["choices"][0]["message"].get("content") or "").strip()
-            return pr["number"], text, usage.get("completion_tokens", 0)
-        res = http_json(f"{OLLAMA_URL}/api/generate", {"model": oc.get("model", "qwen3.5:9b"), "prompt": prompt, "stream": False, "think": False,
-                                                      "options": {"num_ctx": 16384, "temperature": 0.2}}, {"Content-Type": "application/json"}, 300)
-        return pr["number"], res.get("response", "").strip(), res.get("eval_count", 0)
+        text, tokens = llm.complete(prov, model, prompt, max_tokens=dc.get("max_tokens", 400), retry=http_json_retry)
+        if not text:
+            raise RuntimeError("модель вернула пустой ответ")
+        return pr["number"], text, tokens
 
     done = 0
-    with cf.ThreadPoolExecutor(DESCRIBER_WORKERS if provider == "nordrouter" else 2) as ex:
+    # a local model serves one or two requests at a time; a cloud endpoint takes many
+    with cf.ThreadPoolExecutor(2 if prov["kind"] == "ollama" else DESCRIBER_WORKERS) as ex:
         for fut in cf.as_completed([ex.submit(one, p) for p in todo]):
             done += 1
             try:
@@ -631,6 +628,7 @@ def describe_job(slug):
                     P["prs"][n]["ai_description"] = text
                 progress(done, len(todo), n, phase="describe", seconds=round(time.time() - t0, 1), preview=text[:160], title=P["prs"][n]["title"])
             except Exception as e:
+                errors += 1
                 progress(done, len(todo), phase="describe", error=str(e)[:120])
             if done % 20 == 0:
                 with lock:
@@ -638,8 +636,9 @@ def describe_job(slug):
     with lock:
         save_prs(slug)
     recompute(slug)
-    return {"stage": "describe", "started": started, "seconds": round(time.time() - t0), "items": len(todo), "errors": 0,
-            "input_tokens": 0, "output_tokens": out_tokens, "cost_usd": 0, "model": f"ollama/{oc.get('model')}"}
+    return {"stage": "describe", "started": started, "seconds": round(time.time() - t0), "items": len(todo), "errors": errors,
+            "input_tokens": 0, "output_tokens": out_tokens, "cost_usd": 0, "model": f"{prov['name']} · {model}",
+            "local": prov["kind"] == "ollama"}
 
 
 def stage1_job(slug, limit=None):
@@ -1516,12 +1515,13 @@ async def create_project(request: Request):
     if slug in projects:
         raise HTTPException(409, "Такой проект уже есть")
     preset = preset_for(repo)
-    describer = body.get("describer") if body.get("describer") in ("ollama", "nordrouter") else "ollama"
+    # `ollama` / `ollama_model` are the pre-provider names of these fields, still accepted from scripts
+    provider = body.get("describer") if body.get("describer") in llm.PROVIDERS else "ollama"
+    model = body.get("describer_model") or body.get("ollama_model") or llm.PROVIDERS[provider].get("model") or ""
     cfg = {"repo": repo, "name": body.get("name") or preset.get("name") or repo.split("/")[1], "profile": body.get("profile", "").strip() or preset.get("profile", ""),
            "community_only": body.get("community_only", True), "include_drafts": False, "exclude_authors": [],
            "stack_prs": [], "stack_prs_url": "", "finalists": int(body.get("finalists") or preset.get("finalists") or 120),
-           "ollama": {"enabled": bool(body.get("ollama", True)), "provider": describer, "min_body": 200,
-                      "model": body.get("ollama_model") or ("qwen3.5:9b" if describer == "ollama" else DESCRIBER_MODEL)},
+           "describer": {"enabled": bool(body.get("describe", body.get("ollama", True))), "provider": provider, "model": model, "min_body": 200},
            "areas": {"other": "Anything else"}, "area_labels": {"other": "Прочее"}}
     for k in ("areas", "area_labels", "exclude_authors", "stack_prs_url", "default_branch", "forks", "stack", "map"):
         if k in preset:
@@ -1542,11 +1542,15 @@ async def update_config(slug: str, request: Request):
         for k in ("name", "profile", "community_only", "include_drafts", "finalists", "stack_prs_url"):
             if k in body:
                 cfg[k] = body[k]
-        for k in ("forks", "stack", "map", "ollama"):
+        if "ollama" in body and "describer" not in body:  # the pre-provider name
+            body["describer"] = body.pop("ollama")
+        for k in ("forks", "stack", "map", "describer"):
             if k in body:
                 if not isinstance(body[k], dict):
                     raise HTTPException(400, f"«{k}» должен быть объектом")
                 cfg[k] = {**cfg.get(k, {}), **body[k]}
+        if cfg.get("describer", {}).get("provider", "ollama") not in llm.PROVIDERS:
+            raise HTTPException(400, f"Провайдер «{cfg['describer']['provider']}» не настроен на сервере")
         if "exclude_authors" in body:
             cfg["exclude_authors"] = [a.strip() for a in re.split(r"[,\s]+", body["exclude_authors"]) if a.strip()] if isinstance(body["exclude_authors"], str) else body["exclude_authors"]
         if "stack_prs" in body:
@@ -1664,9 +1668,21 @@ def criteria(slug: str):
             "areas": cfg.get("area_labels") or {}, "kinds": KIND_LABELS, "finalists": cfg.get("finalists", 120), "negative": NEGATIVE}
 
 
+@app.get("/api/llm/providers")
+def llm_providers():
+    return [llm.public(p) for p in llm.PROVIDERS.values()]
+
+
+@app.get("/api/llm/{provider}/models")
+def llm_models(provider: str):
+    if provider not in llm.PROVIDERS:
+        raise HTTPException(404, "Такого провайдера нет")
+    return llm.models(provider)
+
+
 @app.get("/api/ollama/models")
 def get_ollama_models():
-    return ollama_models()
+    return llm.models("ollama")
 
 
 # Jobs that never ask Jev (map asks only when a key is set, and works on git alone without one).
@@ -1702,7 +1718,7 @@ async def start_job(slug: str, name: str, request: Request):
 @app.get("/api/status")
 def status():
     return {"job": dict(job), "jev_ready": bool(JEV_KEY), "github_ready": bool(GH_TOKEN), "jev": jev_info(),
-            "nordrouter_ready": bool(NORDROUTER_KEY), "ollama_models": ollama_models()}
+            "llm_providers": llm_providers(), "ollama_models": llm.models("ollama")}
 
 
 def jev_info():

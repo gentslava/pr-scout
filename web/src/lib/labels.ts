@@ -14,7 +14,7 @@ export interface StepDef<K extends string = StageKey | ExtraStageKey> {
 
 export const STEPS: StepDef<StageKey>[] = [
   { key: "fetch", title: "Сбор PR", by: "GitHub GraphQL", icon: GitPullRequest, stage: "fetch", jobs: ["fetch"] },
-  { key: "describe", title: "Описания", by: "локальная модель · Ollama", icon: Cpu, stage: "describe", jobs: ["describe"] },
+  { key: "describe", title: "Описания", by: "LLM · пустые описания PR", icon: Cpu, stage: "describe", jobs: ["describe"] },
   { key: "stage1", title: "Классификация", by: "Jev · все PR", icon: Sparkles, stage: "stage1", jobs: ["stage1"] },
   { key: "stage2", title: "Код и мерж", by: "git + Jev · финалисты", icon: GitMerge, stage: "stage2", jobs: ["stage2"] },
 ]
@@ -83,7 +83,7 @@ export const BREAKDOWN: Record<string, string> = {
 
 export const RUN_NAMES: Record<string, string> = {
   fetch: "Сбор PR",
-  describe: "Описания · Ollama",
+  describe: "Описания · LLM",
   stage1: "Этап 1 · Jev",
   stage2: "Этап 2 · Jev + git",
   "issues-list": "Список issues",

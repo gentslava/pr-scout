@@ -12,9 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { DescriberFields } from "@/components/describer-fields"
 import { api, keys } from "@/lib/api"
 import type { Summary } from "@/lib/types"
 import { useApp } from "@/store/app"
@@ -27,8 +27,8 @@ const schema = z.object({
   stack_prs: z.string().regex(/^[\d,\s#]*$/, "Только номера PR через запятую"),
   stack_prs_url: z.union([z.literal(""), z.url("Нужна ссылка")]),
   finalists: z.number({ error: "Число" }).int().min(10, "Минимум 10").max(500, "Максимум 500"),
-  ollama_enabled: z.boolean(),
-  describer: z.enum(["ollama", "nordrouter"]),
+  describe: z.boolean(),
+  describer: z.string().min(1, "Выберите провайдера"),
   describer_model: z.string().trim(),
   forks_min_stars: z.number({ error: "Число" }).int().min(0, "Не меньше 0"),
   forks_limit: z.number({ error: "Число" }).int().min(0, "Не меньше 0"),
@@ -42,8 +42,8 @@ export function SettingsView({ slug, summary }: { slug: string; summary: Summary
   const toValues = (): Values => ({
     name: c.name ?? "", profile: c.profile ?? "", community_only: !!c.community_only,
     exclude_authors: (c.exclude_authors ?? []).join(", "), stack_prs: (c.stack_prs ?? []).join(", "),
-    stack_prs_url: c.stack_prs_url ?? "", finalists: c.finalists ?? 120, ollama_enabled: !!c.ollama?.enabled,
-    describer: c.ollama?.provider ?? "ollama", describer_model: c.ollama?.model ?? "",
+    stack_prs_url: c.stack_prs_url ?? "", finalists: c.finalists ?? 120, describe: !!c.describer?.enabled,
+    describer: c.describer?.provider ?? "ollama", describer_model: c.describer?.model ?? "",
     forks_min_stars: c.forks?.min_stars ?? 0, forks_limit: c.forks?.limit ?? 0,
   })
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: toValues() })
@@ -53,7 +53,7 @@ export function SettingsView({ slug, summary }: { slug: string; summary: Summary
     mutationFn: (v: Values) => api.saveConfig(slug, {
       name: v.name, profile: v.profile, community_only: v.community_only, exclude_authors: v.exclude_authors,
       stack_prs: v.stack_prs, stack_prs_url: v.stack_prs_url, finalists: v.finalists,
-      ollama: { enabled: v.ollama_enabled, provider: v.describer, ...(v.describer_model ? { model: v.describer_model } : {}) },
+      describer: { enabled: v.describe, provider: v.describer, model: v.describer_model },
       forks: { min_stars: v.forks_min_stars, limit: v.forks_limit },
     }),
     onSuccess: () => {
@@ -73,7 +73,7 @@ export function SettingsView({ slug, summary }: { slug: string; summary: Summary
   })
 
   const err = form.formState.errors
-  const [describeOn, describer] = useWatch({ control: form.control, name: ["ollama_enabled", "describer"] })
+  const [describeOn, describer, describerModel] = useWatch({ control: form.control, name: ["describe", "describer", "describer_model"] })
   return (
     <Card className="max-w-3xl gap-0 rounded-2xl px-10 py-10 shadow-card ring-foreground/[0.07]">
       <form onSubmit={form.handleSubmit((v) => save.mutate(v))}>
@@ -116,34 +116,16 @@ export function SettingsView({ slug, summary }: { slug: string; summary: Summary
             <Input id="finalists" type="number" inputMode="numeric" {...form.register("finalists", { valueAsNumber: true })} />
             <FieldError errors={[err.finalists]} />
           </Field>
-          <Controller control={form.control} name="ollama_enabled" render={({ field }) => (
+          <Controller control={form.control} name="describe" render={({ field }) => (
             <Field orientation="horizontal">
-              <Switch id="ollama_enabled" checked={field.value} onCheckedChange={field.onChange} />
-              <FieldLabel htmlFor="ollama_enabled" className="font-normal">
-                Дописывать описания моделью, если текст автора короче {c.ollama?.min_body ?? 200} символов
+              <Switch id="describe" checked={field.value} onCheckedChange={field.onChange} />
+              <FieldLabel htmlFor="describe" className="font-normal">
+                Дописывать описания моделью, если текст автора короче {c.describer?.min_body ?? 200} символов
               </FieldLabel>
             </Field>
           )} />
-          <div className="grid gap-4 sm:grid-cols-[220px_1fr]">
-            <Controller control={form.control} name="describer" render={({ field }) => (
-              <Field>
-                <FieldLabel>Кто пишет описания</FieldLabel>
-                <Select value={field.value} onValueChange={field.onChange} disabled={!describeOn}>
-                  <SelectTrigger className="h-9! w-full rounded-md"><SelectValue /></SelectTrigger>
-                  <SelectContent position="popper" sideOffset={6}>
-                    <SelectItem value="ollama">Ollama, локально</SelectItem>
-                    <SelectItem value="nordrouter">NordRouter, без GPU</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-            )} />
-            <Field>
-              <FieldLabel htmlFor="describer_model">Модель</FieldLabel>
-              <Input id="describer_model" disabled={!describeOn}
-                placeholder={describer === "nordrouter" ? "google/gemini-3.1-flash-lite" : "qwen3.5:9b"} {...form.register("describer_model")} />
-              {describer === "nordrouter" && <FieldDescription>Нужен NORDROUTER_API_KEY на сервере</FieldDescription>}
-            </Field>
-          </div>
+          <DescriberFields provider={describer} model={describerModel} disabled={!describeOn}
+            onChange={(v) => { form.setValue("describer", v.provider, { shouldDirty: true }); form.setValue("describer_model", v.model, { shouldDirty: true }) }} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field data-invalid={!!err.forks_min_stars}>
               <FieldLabel htmlFor="forks_min_stars">Форки: минимум звёзд</FieldLabel>

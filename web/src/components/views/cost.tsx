@@ -25,7 +25,7 @@ export function CostView({ summary }: { summary: Summary }) {
               </span>
               <span className="text-right text-[13px] text-foreground/80 tabular">
                 {fmt(r.items)} · {secs(r.seconds)}
-                <span className="block">{r.cost_usd ? money(r.cost_usd) : r.output_tokens ? `${fmt(r.output_tokens)} ток. локально` : "бесплатно"}</span>
+                <span className="block">{r.cost_usd ? money(r.cost_usd) : r.output_tokens ? `${fmt(r.output_tokens)} ток.${r.local ?? r.model?.startsWith("ollama/") ? " локально" : ""}` : "бесплатно"}</span>
               </span>
             </li>
           ))}
