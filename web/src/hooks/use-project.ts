@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { api, keys } from "@/lib/api"
-import type { PrRow, Run, StageKey } from "@/lib/types"
+import type { JobName, MapSummary, PrRow, Run, StackResult, Summary } from "@/lib/types"
 import { useApp } from "@/store/app"
 
 export function useProjectData(slug: string) {
@@ -11,7 +11,10 @@ export function useProjectData(slug: string) {
   return { summary: summary.data, prs: prs.data, criteria: criteria.data, loading: summary.isPending || prs.isPending || criteria.isPending }
 }
 
-export const lastRun = (runs: Run[] | undefined, stage: StageKey) => [...(runs ?? [])].reverse().find((r) => r.stage === stage)
+export const useIssues = (slug: string) => useQuery({ queryKey: keys.issues(slug), queryFn: () => api.issues(slug) })
+export const useForks = (slug: string) => useQuery({ queryKey: keys.forks(slug), queryFn: () => api.forks(slug) })
+
+export const lastRun = (runs: Run[] | undefined, stage: Run["stage"]) => [...(runs ?? [])].reverse().find((r) => r.stage === stage)
 
 export const classifiedRows = (prs: PrRow[] | undefined) => (prs ?? []).filter((r) => r.classified)
 
@@ -19,10 +22,10 @@ export function useStartJob(slug: string) {
   const qc = useQueryClient()
   const { resetLive, setTab, setJob } = useApp()
   return useMutation({
-    mutationFn: (job: "full" | StageKey) => api.startJob(slug, job),
+    mutationFn: (job: JobName) => api.startJob(slug, job),
     onSuccess: (_, job) => {
       resetLive()
-      setJob({ running: job === "full" ? "fetch" : job, project: slug })
+      setJob({ running: FIRST_JOB[job] ?? job, project: slug })
       setTab("run")
       qc.invalidateQueries({ queryKey: keys.summary(slug) })
     },
@@ -30,5 +33,15 @@ export function useStartJob(slug: string) {
   })
 }
 
+/** The server job a pipeline starts with, so the UI shows the right step before the first event. */
+const FIRST_JOB: Partial<Record<JobName, string>> = { full: "fetch", everything: "fetch", issues: "fetch_issues", forks: "fetch_forks" }
+
+/** Jev cost of every stage that asked it, not only the PR stages. */
+export const jevRuns = (runs: Run[]) => runs.filter((r) => (r.input_tokens ?? 0) > 0)
+
 /** Area/kind labels with a readable fallback. */
 export const labelOf = (map: Record<string, string> | undefined, key: string | undefined) => (key ? map?.[key] ?? key : "—")
+
+/** The server sends {} for a stage that has not run yet. */
+export const hasStack = (s: Summary["stack"]): s is StackResult => "considered" in s
+export const hasMap = (m: Summary["map"]): m is MapSummary => "plans" in m

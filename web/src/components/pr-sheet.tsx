@@ -89,7 +89,7 @@ export function PrSheet({ slug, repo, criteria }: { slug: string; repo: string; 
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
       <h3 className="mb-4 text-[15px] font-semibold tracking-[-0.015em]">{title}</h3>
@@ -98,7 +98,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Breakdown({ values }: { values: Record<string, number> }) {
+export function Breakdown({ values }: { values: Record<string, number> }) {
   const max = Math.max(1, ...Object.values(values).map(Math.abs))
   return (
     <div className="flex flex-col gap-3">

@@ -16,6 +16,8 @@ export function useServerEvents() {
     const refreshProject = (slug: string) => {
       qc.invalidateQueries({ queryKey: keys.summary(slug) })
       qc.invalidateQueries({ queryKey: keys.prs(slug) })
+      qc.invalidateQueries({ queryKey: keys.issues(slug) })
+      qc.invalidateQueries({ queryKey: keys.forks(slug) })
     }
 
     const onEvent = (ev: ServerEvent) => {
@@ -32,8 +34,8 @@ export function useServerEvents() {
           app.setJob({ running: ev.job, project: ev.project })
           if (ev.project === app.slug) {
             app.stepStarted()
-            // the previous step has just written its run: refresh so it stops saying "not run yet"
-            qc.invalidateQueries({ queryKey: keys.summary(ev.project) })
+            // the previous step has just written its run and results: refresh so they show up right away
+            refreshProject(ev.project)
           }
           return
         case "log":
@@ -51,6 +53,9 @@ export function useServerEvents() {
         }
         case "progress":
           if (ev.project === app.slug) app.progress(ev)
+          return
+        case "fork":
+          if (ev.project === app.slug) app.fork(ev)
           return
       }
     }

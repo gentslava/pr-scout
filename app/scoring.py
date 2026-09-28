@@ -238,15 +238,17 @@ def verdict(row, stage2):
 
 # Anthropic list prices per 1M tokens (input, output), used only for the "Jev vs a generative model" estimate.
 LLM_PRICES = {"Claude Opus 5.5": (4.0, 20.0), "Claude Sonnet 5": (2.0, 10.0), "Claude Haiku 4.5": (1.0, 5.0)}
-OUTPUT_ESTIMATE = {"stage1": 1000, "stage2": 1500}  # tokens a generative model would write per PR (JSON + short reasoning)
+# Tokens a generative model would write per Jev call (JSON + short reasoning), by stage.
+OUTPUT_ESTIMATE = {"stage1": 1000, "stage2": 1500, "issues": 800, "forks": 800, "rivals": 400, "map": 300}
 
 
 def cost_comparison(runs):
-    jev = [r for r in runs if r.get("stage") in ("stage1", "stage2")]
+    jev = [r for r in runs if r.get("stage") in OUTPUT_ESTIMATE and r.get("input_tokens")]
     if not jev:
         return None
     inp = sum(r.get("input_tokens", 0) for r in jev)
-    out = sum(OUTPUT_ESTIMATE[r["stage"]] * r.get("items", 0) for r in jev)
+    # forks and map ask Jev about a subset of their items; runs record that count as jev_calls
+    out = sum(OUTPUT_ESTIMATE[r["stage"]] * r.get("jev_calls", r.get("items", 0)) for r in jev)
     rows = [{"name": "Jev (факт)", "cost": round(sum(r.get("cost_usd", 0) for r in jev), 4), "seconds": sum(r.get("seconds", 0) for r in jev), "actual": True}]
     for name, (pi, po) in LLM_PRICES.items():
         c = inp * pi / 1e6 + out * po / 1e6

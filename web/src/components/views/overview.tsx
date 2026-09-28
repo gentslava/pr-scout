@@ -2,7 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
 import { KindDonut, ScoreHistogram } from "@/components/charts"
 import { HBars, Pill, PrTags, Reasons, ScoreRing } from "@/components/pr-bits"
-import { classifiedRows, labelOf } from "@/hooks/use-project"
+import { StatCards } from "@/components/stat-cards"
+import { classifiedRows, jevRuns, labelOf } from "@/hooks/use-project"
 import { fmt, money, secs } from "@/lib/format"
 import { VERDICT, VERDICT_HINT } from "@/lib/labels"
 import type { Criteria, PrRow, Summary, Verdict } from "@/lib/types"
@@ -21,28 +22,16 @@ export function Overview({ summary, prs, criteria }: { summary: Summary; prs: Pr
 
 function Kpis({ summary, prs }: { summary: Summary; prs: PrRow[] }) {
   const by = (v: Verdict) => prs.filter((r) => r.verdict === v).length
-  const jev = summary.runs.filter((r) => r.stage === "stage1" || r.stage === "stage2")
+  const jev = jevRuns(summary.runs)
   const cost = jev.reduce((a, r) => a + (r.cost_usd ?? 0), 0)
   const time = jev.reduce((a, r) => a + (r.seconds ?? 0), 0)
-  const items = [
-    { label: "Открытых PR", value: fmt(summary.total), sub: `${fmt(summary.finalists)} дошли до ревью кода` },
-    { label: "Берём", value: fmt(by("take")), sub: "сильные и чистые", dot: "bg-take" },
-    { label: "Рассмотреть", value: fmt(by("consider")), sub: `есть оговорки · ${fmt(by("skip"))} пропускаем`, dot: "bg-consider" },
-    { label: "Jev обошёлся в", value: money(cost), sub: `за ${secs(time)} работы`, accent: true },
-  ]
   return (
-    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-      {items.map((k) => (
-        <Card key={k.label} className="gap-0 rounded-2xl px-6 py-6 shadow-card ring-foreground/[0.07]">
-          <span className="flex items-center gap-2 text-[13.5px] text-muted-foreground">
-            {k.dot && <span className={cn("size-1.5 rounded-full", k.dot)} />}
-            {k.label}
-          </span>
-          <span className={cn("mt-5 text-4xl font-semibold tracking-[-0.04em] tabular", k.accent && "text-brand")}>{k.value}</span>
-          <span className="mt-1.5 text-[13px] text-muted-foreground">{k.sub}</span>
-        </Card>
-      ))}
-    </div>
+    <StatCards items={[
+      { label: "Открытых PR", value: fmt(summary.total), sub: `${fmt(summary.finalists)} дошли до ревью кода` },
+      { label: "Берём", value: fmt(by("take")), sub: "сильные и чистые", dot: "bg-take" },
+      { label: "Рассмотреть", value: fmt(by("consider")), sub: `есть оговорки · ${fmt(by("skip"))} пропускаем`, dot: "bg-consider" },
+      { label: "Jev обошёлся в", value: money(cost), sub: `за ${secs(time)} работы`, accent: true },
+    ]} />
   )
 }
 

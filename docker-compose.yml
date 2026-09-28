@@ -3,16 +3,37 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY}
+      # Jev: TypeSafe (TYPESAFE_API_KEY) or NordRouter (NORDROUTER_API_KEY). With one key set the
+      # provider follows it; with both, TypeSafe wins unless JEV_PROVIDER=nordrouter.
+      TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
+      NORDROUTER_API_KEY: ${NORDROUTER_API_KEY:-}
+      JEV_PROVIDER: ${JEV_PROVIDER:-}
+      # Empty means the provider's default endpoint, model and price
+      JEV_API_URL: ${JEV_API_URL:-}
+      JEV_MODEL: ${JEV_MODEL:-}
+      JEV_PRICE_PER_MTOK: ${JEV_PRICE_PER_MTOK:-}
       APP_PASSWORD: ${APP_PASSWORD}
       # Recommended: a GitHub token without scopes (higher rate limit, CI status of finalists)
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       # Local model for PR descriptions (Ollama on the Docker host)
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      # ...or NordRouter's chat endpoint for them, no GPU needed (needs NORDROUTER_API_KEY)
+      NORDROUTER_URL: ${NORDROUTER_URL:-}
+      DESCRIBER_MODEL: ${DESCRIBER_MODEL:-}
+      DESCRIBER_WORKERS: ${DESCRIBER_WORKERS:-}
+      # Concurrency; empty means the defaults documented in .env.example
+      JEV_STAGE1_WORKERS: ${JEV_STAGE1_WORKERS:-}
+      JEV_STAGE2_WORKERS: ${JEV_STAGE2_WORKERS:-}
+      JEV_MERGE_WORKERS: ${JEV_MERGE_WORKERS:-}
+      FORK_REST_WORKERS: ${FORK_REST_WORKERS:-}
+      FORK_LIST_WORKERS: ${FORK_LIST_WORKERS:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - scout_data:/data
+      # Presets are read from the host: a new repository is a new presets/<owner__repo>.json,
+      # no image rebuild needed
+      - ./presets:/srv/presets:ro
     ports:
       - "127.0.0.1:${SCOUT_PORT:-8000}:8000"
 

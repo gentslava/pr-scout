@@ -1,4 +1,4 @@
-import { ArrowUpRight, ChevronDown, Play } from "lucide-react"
+import { ArrowUpRight, ChevronDown, Download, Play, Rocket } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -7,7 +7,8 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useStartJob } from "@/hooks/use-project"
 import { avatarUrl, fmt } from "@/lib/format"
-import { STEPS } from "@/lib/labels"
+import { api } from "@/lib/api"
+import { EXTRA_STEPS, STEPS, type StepDef } from "@/lib/labels"
 import type { Summary } from "@/lib/types"
 import { useApp } from "@/store/app"
 
@@ -43,6 +44,14 @@ export function ProjectHeader({ slug, summary }: { slug: string; summary: Summar
         )}
       </div>
       <div className="flex items-center gap-2 pt-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="icon-lg" className="size-10 rounded-full shadow-card" asChild>
+              <a href={api.reportUrl(slug)} download aria-label="Скачать отчёт"><Download /></a>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Отчёт по всему циклу, markdown</TooltipContent>
+        </Tooltip>
         <Button size="lg" className="h-10 rounded-full px-5 text-[14px]" disabled={busy || start.isPending} onClick={() => start.mutate("full")}>
           <Play className="fill-current" /> Полный прогон
         </Button>
@@ -52,21 +61,35 @@ export function ProjectHeader({ slug, summary }: { slug: string; summary: Summar
               <ChevronDown />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuLabel>Запустить один шаг</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="max-h-[min(640px,var(--radix-dropdown-menu-content-available-height))] w-80 overflow-y-auto">
+            <DropdownMenuItem className="gap-3 py-2" onSelect={() => start.mutate("everything")}>
+              <Rocket className="text-brand" />
+              <span className="flex flex-col">
+                <span className="font-medium">Весь цикл</span>
+                <span className="text-xs text-muted-foreground">PR → issues → конкуренты → форки → стек → карта мержей</span>
+              </span>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {STEPS.map((s) => (
-              <DropdownMenuItem key={s.key} className="gap-3 py-2" onSelect={() => start.mutate(s.key)}>
-                <s.icon className="text-muted-foreground" />
-                <span className="flex flex-col">
-                  <span className="font-medium">{s.title}</span>
-                  <span className="text-xs text-muted-foreground">{s.by}</span>
-                </span>
-              </DropdownMenuItem>
-            ))}
+            <DropdownMenuLabel>Pull request</DropdownMenuLabel>
+            {STEPS.map((s) => <StepItem key={s.key} step={s} onSelect={() => start.mutate(s.key)} />)}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Шире PR</DropdownMenuLabel>
+            {EXTRA_STEPS.map((s) => <StepItem key={s.key} step={s} onSelect={() => start.mutate(s.key)} />)}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
     </header>
+  )
+}
+
+function StepItem({ step, onSelect }: { step: StepDef; onSelect: () => void }) {
+  return (
+    <DropdownMenuItem className="gap-3 py-2" onSelect={onSelect}>
+      <step.icon className="text-muted-foreground" />
+      <span className="flex flex-col">
+        <span className="font-medium">{step.title}</span>
+        <span className="text-xs text-muted-foreground">{step.by}</span>
+      </span>
+    </DropdownMenuItem>
   )
 }

@@ -1,0 +1,48 @@
+{
+  "repo": "siteboon/claudecodeui",
+  "name": "CloudCLI",
+  "profile": "Our setup: a self-hosted CloudCLI instance used as the single web workspace for several agent CLIs (Claude Code, Codex, Gemini, OpenCode) and non-Anthropic models through a provider router, used from a desktop browser and a phone. What matters most: reliable sessions (websocket reconnect, live streaming of text and tool calls, visible subagent runs), every agent CLI and provider in one window, session history that is easy to navigate, artifacts and file previews in the browser, and headless install and auth of the CLIs. Upstream releases are merged into our fork every version, so small self-contained fixes matter more than sweeping refactors. No telemetry, no vendor lock-in.",
+  "areas": {
+    "providers_cli": "Agent provider integrations and CLI adapters: Claude Code, Codex, Cursor, Gemini/Antigravity, OpenCode, Qwen; CLI auth, model lists, runtime wrapper, provider settings",
+    "sessions_streaming": "Sessions and the chat stream: session list/history/transcripts, resume and fork, websockets, live output, subagent runs and completion, mobile reconnect",
+    "permissions_auth": "Users, login, permissions, guest and shared access, tokens and stored credentials",
+    "files_git": "File tree and explorer, file editing from the chat, git panel, diffs, branches and worktrees",
+    "tasks_board": "Task board, TaskMaster, session tasks and statuses, notes, scheduled messages",
+    "artifacts": "Artifacts: browser previews, shared links and passwords, downloads, attached files, retention/TTL, assets",
+    "ui_ux": "Web UI: layout, themes, components, mobile viewport, styling and keyboard shortcuts",
+    "deploy_desktop": "Install, hosting, Docker, self-host, desktop (Electron) builds, service exposure (Caddy/nginx), updates and release tooling",
+    "mcp_plugins": "MCP servers, plugins and extension points, project and workspace handling",
+    "docs": "Documentation only",
+    "other": "Anything else"
+  },
+  "area_labels": {
+    "providers_cli": "Провайдеры и CLI",
+    "sessions_streaming": "Сессии и стрим",
+    "permissions_auth": "Доступ и права",
+    "files_git": "Файлы и git",
+    "tasks_board": "Задачи и доска",
+    "artifacts": "Артефакты",
+    "ui_ux": "Интерфейс",
+    "deploy_desktop": "Деплой и десктоп",
+    "mcp_plugins": "MCP и плагины",
+    "docs": "Документация",
+    "other": "Прочее"
+  },
+  "exclude_authors": [],
+  "community_only": false,
+  "stack_prs_url": "",
+  "stack_prs": [],
+  "finalists": 60,
+  "ollama": {
+    "enabled": true,
+    "model": "qwen3.5:9b",
+    "min_body": 200
+  },
+  "custom_areas": true,
+  "default_branch": "main",
+  "forks": {
+    "limit": 0,
+    "min_stars": 0,
+    "max_commits": 30
+  }
+}

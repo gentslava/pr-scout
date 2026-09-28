@@ -8,14 +8,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AddProjectDialog } from "@/components/add-project-dialog"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Pipeline } from "@/components/pipeline"
+import { IssueSheet } from "@/components/issue-sheet"
 import { PrSheet } from "@/components/pr-sheet"
 import { ProjectHeader } from "@/components/project-header"
 import { AllPrs } from "@/components/views/all-prs"
 import { CostView } from "@/components/views/cost"
 import { CriteriaView } from "@/components/views/criteria"
+import { ForksView } from "@/components/views/forks"
+import { IssuesView } from "@/components/views/issues"
 import { Overview } from "@/components/views/overview"
 import { RunView } from "@/components/views/run"
 import { SettingsView } from "@/components/views/settings"
+import { StackView } from "@/components/views/stack"
 import { useProjectData, classifiedRows } from "@/hooks/use-project"
 import { useServerEvents } from "@/hooks/use-server-events"
 import { api, keys } from "@/lib/api"
@@ -48,7 +52,10 @@ export default function App() {
   )
 }
 
-const TABS: [Tab, string][] = [["overview", "Обзор"], ["all", "Все PR"], ["run", "Прогон"], ["criteria", "Как оценивает"], ["cost", "Стоимость"], ["settings", "Настройки"]]
+const TABS: [Tab, string][] = [
+  ["overview", "Обзор"], ["all", "Все PR"], ["issues", "Issues"], ["forks", "Форки"], ["stack", "Сборка"],
+  ["run", "Прогон"], ["criteria", "Как оценивает"], ["cost", "Стоимость"], ["settings", "Настройки"],
+]
 
 function ProjectPage({ slug }: { slug: string }) {
   const { summary, prs, criteria, loading } = useProjectData(slug)
@@ -80,6 +87,8 @@ function ProjectPage({ slug }: { slug: string }) {
               <TabsTrigger key={v} value={v} className="h-9 flex-none rounded-full px-4 text-[13.5px] data-[state=active]:shadow-card">
                 {label}
                 {v === "all" && <span className="text-xs text-muted-foreground tabular">{fmt(classifiedRows(prs).length)}</span>}
+                {v === "issues" && summary.issues.without_pr > 0 && <span className="text-xs text-muted-foreground tabular">{fmt(summary.issues.without_pr)}</span>}
+                {v === "forks" && summary.forks.classified > 0 && <span className="text-xs text-muted-foreground tabular">{fmt(summary.forks.classified - summary.forks.duplicates)}</span>}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -88,12 +97,16 @@ function ProjectPage({ slug }: { slug: string }) {
       <div className="mx-auto w-full max-w-[1480px] px-4 pt-8 pb-28 md:px-14">
         <TabsContent value="overview"><Overview summary={summary} prs={prs} criteria={criteria} /></TabsContent>
         <TabsContent value="all"><AllPrs prs={prs} criteria={criteria} /></TabsContent>
+        <TabsContent value="issues"><IssuesView slug={slug} summary={summary} prs={prs} /></TabsContent>
+        <TabsContent value="forks"><ForksView slug={slug} summary={summary} /></TabsContent>
+        <TabsContent value="stack"><StackView slug={slug} summary={summary} prs={prs} /></TabsContent>
         <TabsContent value="run"><RunView slug={slug} summary={summary} prs={prs} criteria={criteria} /></TabsContent>
         <TabsContent value="criteria"><CriteriaView criteria={criteria} /></TabsContent>
         <TabsContent value="cost"><CostView summary={summary} /></TabsContent>
         <TabsContent value="settings"><SettingsView slug={slug} summary={summary} /></TabsContent>
       </div>
       <PrSheet slug={slug} repo={summary.config.repo} criteria={criteria} />
+      <IssueSheet slug={slug} repo={summary.config.repo} prs={prs} />
     </Tabs>
   )
 }
@@ -115,8 +128,8 @@ function Welcome() {
       <LogoMark className="mx-auto size-20" />
       <h1 className="mt-6 text-5xl font-semibold tracking-[-0.04em]">Какие PR стоит взять?</h1>
       <p className="mt-4 text-[16.5px] leading-relaxed text-foreground/70">
-        PR Scout собирает все открытые pull request репозитория, дописывает пустые описания локальной моделью и за пару минут раскладывает их через Jev:
-        что берём, что рассмотреть, что пропустить — с причинами.
+        PR Scout собирает все открытые pull request репозитория, дописывает пустые описания и за пару минут раскладывает их через Jev:
+        что берём, что рассмотреть, что пропустить — с причинами. А ещё находит важные issues без PR, работу в форках и считает, во что обойдётся поддержка.
       </p>
       <Button size="lg" className="mt-8 h-11 rounded-full px-6" onClick={() => setAddOpen(true)}><Plus /> Добавить репозиторий</Button>
     </div>

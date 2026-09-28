@@ -52,5 +52,10 @@
     "min_body": 200
   },
   "custom_areas": true,
-  "default_branch": "master"
+  "default_branch": "master",
+  "forks": {
+    "limit": 0,
+    "min_stars": 0,
+    "max_commits": 30
+  }
 }

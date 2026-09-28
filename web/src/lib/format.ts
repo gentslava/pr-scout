@@ -24,7 +24,22 @@ export function ago(iso: string | null | undefined): string {
   if (m < 1) return "только что"
   if (m < 60) return `${Math.round(m)} мин назад`
   if (m < 1440) return `${Math.round(m / 60)} ч назад`
-  return `${Math.round(m / 1440)} дн назад`
+  const d = Math.round(m / 1440)
+  if (d < 45) return `${d} дн назад`
+  if (d < 365) return `${count(Math.round(d / 30), "месяц", "месяца", "месяцев")} назад`
+  return `${count(Math.round(d / 365), "год", "года", "лет")} назад`
 }
 
 export const avatarUrl = (repo: string, size = 64) => `https://github.com/${repo.split("/")[0]}.png?size=${size}`
+
+/** Russian plural: plural(2, "группа", "группы", "групп") → "группы". */
+export function plural(n: number, one: string, few: string, many: string): string {
+  const a = Math.abs(n) % 100, b = a % 10
+  if (a > 10 && a < 20) return many
+  if (b === 1) return one
+  if (b >= 2 && b <= 4) return few
+  return many
+}
+
+/** A count with its noun: count(2, "группа", "группы", "групп") → "2 группы". */
+export const count = (n: number, one: string, few: string, many: string) => `${fmt(n)} ${plural(n, one, few, many)}`
