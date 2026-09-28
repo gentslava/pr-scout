@@ -142,12 +142,15 @@ function AnswerValue({ k, a, criteria }: { k: string; a: Answer; criteria: Crite
   }
   const legend = a.type === "choice" ? (k === "area" ? criteria.areas : k === "kind" ? criteria.kinds : undefined) : a.legend
   const probs = Object.entries(a.probabilities ?? {}).sort((x, y) => y[1] - x[1]).slice(0, 6)
+  // the scale comes from the answer's legend when the provider sends one, else from the question itself
+  const question = criteria.stage1[k] ?? criteria.stage2[k]
+  const levels = Object.keys(a.legend ?? question?.criteria ?? {}).length
   return (
     <div className="flex flex-col gap-2">
       <span className="flex flex-wrap items-center gap-2">
         <b className="font-semibold">{a.type === "choice" ? labelOf(legend, a.choice) : fmt(a.score, 2)}</b>
-        {a.type === "score" && <span className="text-muted-foreground">из {Object.keys(a.legend ?? {}).length - 1}</span>}
-        <Pill tone="outline">уверенность {fmt((a.confidence ?? 0) * 100)}%</Pill>
+        {a.type === "score" && levels > 1 && <span className="text-muted-foreground">из {levels - 1}</span>}
+        {a.confidence != null && <Pill tone="outline">уверенность {fmt(a.confidence * 100)}%</Pill>}
       </span>
       <div className="flex flex-col gap-1.5">
         {probs.map(([key, p]) => (
