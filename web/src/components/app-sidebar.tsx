@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Moon, Plus, Sun } from "lucide-react"
-import { useTheme } from "next-themes"
+import { Plus } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,12 +11,12 @@ import { avatarUrl, fmt } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { useApp } from "@/store/app"
 import { LogoMark } from "@/components/logo-mark"
+import { ThemeSwitch } from "@/components/theme-switch"
 
 export function AppSidebar() {
   const projects = useQuery({ queryKey: keys.projects, queryFn: api.projects })
   const status = useQuery({ queryKey: keys.status, queryFn: api.status, refetchInterval: 60_000 })
   const { slug, setSlug, setAddOpen, job } = useApp()
-  const { resolvedTheme, setTheme } = useTheme()
   const models = status.data?.ollama_models ?? []
   const cloud = (status.data?.llm_providers ?? []).filter((p) => !p.local && p.ready)
   const llmText = [models.length ? `Ollama · ${models.length} мод.` : null, ...cloud.map((p) => p.name)].filter(Boolean).join(", ")
@@ -62,16 +61,16 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="flex-row items-end justify-between border-t px-4 py-3">
+      <SidebarFooter className="gap-3 border-t px-4 py-3">
         <ul className="flex flex-col gap-1.5 text-xs text-muted-foreground">
           <Service ok={status.data?.jev_ready} text={status.data?.jev_ready ? "Jev подключён" : "Jev: нет ключа"} />
           <Service ok={status.data?.github_ready} text={status.data?.github_ready ? "GitHub токен есть" : "GitHub: нет токена"} />
           <Service ok={!!llmText} text={llmText ? `LLM: ${llmText}` : "LLM: нет ни одного провайдера"} />
         </ul>
-        <Button variant="outline" size="icon" className="rounded-full" aria-label="Сменить тему"
-          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
-          {resolvedTheme === "dark" ? <Sun /> : <Moon />}
-        </Button>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          Тема
+          <ThemeSwitch />
+        </div>
       </SidebarFooter>
     </Sidebar>
   )
