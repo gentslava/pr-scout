@@ -77,8 +77,9 @@ flowchart LR
 
 1. **Сбор.** GraphQL API GitHub отдаёт все открытые PR: заголовок, описание, файлы, размер, автора и его роль в репозитории.
    Можно оставить только PR сообщества — без владельцев, мейнтейнеров и коллабораторов — и исключить отдельных авторов.
-2. **Описания.** Если описание короче 200 символов, локальная модель в [Ollama](https://ollama.com) читает диф и пишет
-   короткое описание. Оно помечено как сгенерированное и идёт только в оценку, в GitHub ничего не отправляется.
+2. **Описания.** Если описание короче 200 символов, LLM читает диф и пишет короткое описание: локальная модель
+   в [Ollama](https://ollama.com) или любая через OpenAI-совместимый API (NordRouter, OpenRouter, OpenAI, свой эндпоинт).
+   Оно помечено как сгенерированное и идёт только в оценку, в GitHub ничего не отправляется.
 3. **Этап 1 — все PR.** Jev получает заголовок, описание и список файлов и отвечает на вопросы: тип изменения, часть системы,
    релевантность вашему сценарию, серьёзность бага, ценность фичи и десяток вопросов «да/нет» с вероятностью.
 4. **Отбор.** Из ответов считается балл 0–100, дубли (тот же issue или тот же заголовок) схлопываются, лучшие N идут дальше.
@@ -159,9 +160,22 @@ docker compose up -d --build
 
 Откройте <http://localhost:8000>, нажмите «Добавить репозиторий» и вставьте ссылку.
 
-### Ollama (необязательно)
+### Модель для описаний (необязательно)
 
-Если на хосте запущена Ollama, Scout сам найдёт её через `host.docker.internal` и предложит список моделей.
+Пустые описания PR дописывает LLM. Провайдер и модель выбираются в настройках каждого проекта из тех, что настроены на сервере;
+список моделей подтягивается у провайдера.
+
+| Провайдер | Как включить |
+|---|---|
+| Ollama на хосте | ничего: Scout найдёт её через `host.docker.internal` |
+| NordRouter | `NORDROUTER_API_KEY` (тот же ключ, что для Jev) |
+| OpenRouter | `OPENROUTER_API_KEY` |
+| OpenAI | `OPENAI_API_KEY` |
+| Любой OpenAI-совместимый: vLLM, LM Studio, DeepSeek, Groq, свой шлюз | `LLM_API_URL` (+ `LLM_API_KEY`, `LLM_API_NAME`, `LLM_MODEL`) |
+| Несколько своих сразу | `LLM_PROVIDERS` — JSON-массив `{"id", "name", "url", "key", "model"}`, пример в `.env.example` |
+
+Новые модели OpenAI, которые не принимают `max_tokens`, работают без настройки: запрос повторяется с `max_completion_tokens`.
+
 Ollama должна слушать не только localhost:
 
 ```bash
@@ -170,7 +184,7 @@ sudo systemctl edit ollama   # [Service] Environment="OLLAMA_HOST=0.0.0.0:11434"
 ollama pull qwen3.5:9b
 ```
 
-Без Ollama шаг описаний просто пропускается.
+Без провайдера шаг описаний просто выключен.
 
 ### Без Docker
 
@@ -197,13 +211,16 @@ cd web && npm run dev   # Vite на :5173, /api проксируется на б
 | Переменная | | Описание |
 |---|---|---|
 | `TYPESAFE_API_KEY` | один из двух | ключ Jev у TypeSafe |
-| `NORDROUTER_API_KEY` | один из двух | ключ Jev у NordRouter (тот же Jev, $0.05 за 1M входных токенов); им же пишутся описания без GPU |
+| `NORDROUTER_API_KEY` | один из двух | ключ Jev у NordRouter (тот же Jev, $0.05 за 1M входных токенов); он же включает NordRouter для описаний |
 | `JEV_PROVIDER` | | `typesafe` или `nordrouter`; без него провайдер определяется по заданному ключу, при обоих — TypeSafe |
 | `JEV_API_URL`, `JEV_MODEL`, `JEV_PRICE_PER_MTOK` | | переопределить эндпоинт, модель и цену за 1M токенов (по умолчанию — значения выбранного провайдера) |
 | `APP_PASSWORD` | рекомендуется | пароль для входа (HTTP Basic, логин любой) |
 | `GITHUB_TOKEN` | рекомендуется | токен без прав: лимит 5000 запросов/ч вместо 60 и статус CI финалистов |
 | `OLLAMA_URL` | | адрес Ollama, по умолчанию `http://host.docker.internal:11434` |
-| `DESCRIBER_MODEL` | | модель для описаний через NordRouter, по умолчанию `google/gemini-3.1-flash-lite` |
+| `OPENROUTER_API_KEY`, `OPENAI_API_KEY` | | включают этих провайдеров для описаний |
+| `LLM_API_URL`, `LLM_API_KEY`, `LLM_API_NAME`, `LLM_MODEL`, `LLM_PROVIDERS` | | свои OpenAI-совместимые провайдеры для описаний, см. «Модель для описаний» |
+| `DESCRIBER_MODEL` | | модель NordRouter для описаний по умолчанию, `google/gemini-3.1-flash-lite` |
+| `DESCRIBER_WORKERS` | | параллельные запросы к облачному провайдеру описаний, по умолчанию 6 |
 | `JEV_STAGE1_WORKERS`, `JEV_STAGE2_WORKERS` | | параллельные запросы к Jev, по умолчанию 14 и 10 (у NordRouter лимит 15 rps) |
 | `JEV_MERGE_WORKERS` | | параллельные тестовые мержи в git worktree, по умолчанию 4 |
 | `FORK_REST_WORKERS`, `FORK_LIST_WORKERS` | | параллельность разбора форков, по умолчанию 16 и 8 |
@@ -244,6 +261,8 @@ GET  /api/p/{owner__repo}/report.md    весь цикл одним markdown-о�
 POST /api/p/{owner__repo}/jobs/full    прогон PR (или fetch · describe · stage1 · stage2)
 POST /api/p/{owner__repo}/jobs/everything   весь цикл: PR → issues → конкуренты → форки → стек → карта
                                        (или отдельно: issues · rivals · forks · stack · map)
+GET  /api/llm/providers                провайдеры LLM для описаний (без ключей)
+GET  /api/llm/{provider}/models        модели провайдера
 GET  /api/events                       поток событий прогона (SSE)
 ```
 

@@ -17,7 +17,7 @@ const p = (slug: string, path = "") => `/api/p/${slug}${path}`
 export const api = {
   status: () => request<Status>("/api/status"),
   projects: () => request<Project[]>("/api/projects"),
-  createProject: (body: { url: string; profile: string; community_only: boolean; ollama: boolean; describer: string; ollama_model: string; run: boolean }) =>
+  createProject: (body: { url: string; profile: string; community_only: boolean; describe: boolean; describer: string; describer_model: string; run: boolean }) =>
     send<{ slug: string }>("/api/projects", body),
   deleteProject: (slug: string) => request<{ ok: boolean }>(p(slug), { method: "DELETE" }),
   summary: (slug: string) => request<Summary>(p(slug, "/summary")),
@@ -28,12 +28,13 @@ export const api = {
   issue: (slug: string, n: number) => request<IssueDetail>(p(slug, `/issues/${n}`)),
   forks: (slug: string) => request<ForkRow[]>(p(slug, "/forks")),
   reportUrl: (slug: string) => p(slug, "/report.md"),
-  saveConfig: (slug: string, body: Partial<Omit<ProjectConfig, "exclude_authors" | "stack_prs" | "ollama" | "forks">> & {
+  saveConfig: (slug: string, body: Partial<Omit<ProjectConfig, "exclude_authors" | "stack_prs" | "describer" | "forks">> & {
     exclude_authors?: string
     stack_prs?: string
-    ollama?: Partial<ProjectConfig["ollama"]>
+    describer?: Partial<ProjectConfig["describer"]>
     forks?: Partial<NonNullable<ProjectConfig["forks"]>>
   }) => send<ProjectConfig>(p(slug, "/config"), body, "PUT"),
+  llmModels: (provider: string) => request<string[]>(`/api/llm/${encodeURIComponent(provider)}/models`),
   startJob: (slug: string, job: JobName) => send<{ ok: boolean }>(p(slug, `/jobs/${job}`), {}),
 }
 
@@ -47,4 +48,5 @@ export const keys = {
   issues: (slug: string) => ["issues", slug] as const,
   issue: (slug: string, n: number) => ["issue", slug, n] as const,
   forks: (slug: string) => ["forks", slug] as const,
+  llmModels: (provider: string) => ["llm-models", provider] as const,
 }

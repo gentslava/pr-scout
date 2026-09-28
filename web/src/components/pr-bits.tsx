@@ -118,7 +118,7 @@ export function AiMark() {
       <TooltipTrigger asChild>
         <span><Pill tone="brand"><PenLine className="size-3" /> ИИ</Pill></span>
       </TooltipTrigger>
-      <TooltipContent>Описание дописала локальная модель</TooltipContent>
+      <TooltipContent>Описание по дифу дописала модель — у автора текста не было</TooltipContent>
     </Tooltip>
   )
 }

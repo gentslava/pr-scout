@@ -46,8 +46,9 @@
   "stack_prs_url": "https://raw.githubusercontent.com/gentslava/paperclip/plus/.plus/prs.txt",
   "stack_prs": [],
   "finalists": 120,
-  "ollama": {
+  "describer": {
     "enabled": true,
+    "provider": "ollama",
     "model": "qwen3.5:9b",
     "min_body": 200
   },

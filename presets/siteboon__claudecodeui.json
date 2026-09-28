@@ -33,8 +33,9 @@
   "stack_prs_url": "",
   "stack_prs": [],
   "finalists": 60,
-  "ollama": {
+  "describer": {
     "enabled": true,
+    "provider": "ollama",
     "model": "qwen3.5:9b",
     "min_body": 200
   },

@@ -94,7 +94,7 @@ export function RunView({ slug, summary, prs, criteria }: { slug: string; summar
                           {it.kind === "describe" && <span className="mt-1 line-clamp-2 block text-[12.5px] text-muted-foreground">✎ {it.preview}…</span>}
                         </span>
                         {it.kind === "row" && <ScoreRing score={it.row.score} size={40} />}
-                        {it.kind === "describe" && <Pill tone="brand">{summary.config.ollama?.provider === "nordrouter" ? "NordRouter" : "Ollama"}</Pill>}
+                        {it.kind === "describe" && <Pill tone="brand">{summary.config.describer?.model || "LLM"}</Pill>}
                         {it.kind === "merge" && <Pill tone={it.clean ? "take" : "danger"}>{it.clean ? "ложится" : "конфликт"}</Pill>}
                         {it.kind === "stack" && <Pill tone={it.result === "merged" ? "take" : it.result === "conflict" ? "danger" : "outline"}>{STACK_RESULT[it.result] ?? it.result}</Pill>}
                       </button>
